@@ -1,5 +1,5 @@
 [project]
-name = "homeassistant-mcp"
+name = "ravencorvus"
 version = "0.1.0"
 description = "MCP server and CLI for Home Assistant (REST + WebSocket) with an operator-controlled write guard"
 readme = "README.md"

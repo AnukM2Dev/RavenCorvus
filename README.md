@@ -1,4 +1,4 @@
-# homeassistant-mcp
+# RavenCorvus
 
 An MCP server (stdio) and a companion `ha` CLI that give an agent read/write access to a
 [Home Assistant](https://www.home-assistant.io/) instance, with a write guard the **operator** controls.
@@ -18,7 +18,7 @@ reachable from a bare shell when MCP is not wired up.
 ## Install
 
 ```bash
-cd homeassistant-mcp
+cd RavenCorvus
 uv sync            # Python >=3.11
 uv run ha --help
 ```
@@ -109,7 +109,7 @@ reason if not), whether the service exists, and the current state of each target
   "mcpServers": {
     "homeassistant": {
       "command": "uv",
-      "args": ["run", "--quiet", "--project", "/absolute/path/to/homeassistant-mcp", "ha-mcp"],
+      "args": ["run", "--quiet", "--project", "/absolute/path/to/RavenCorvus", "ha-mcp"],
       "env": {
         "HASS_URL": "http://homeassistant.local:8123",
         "HASS_TOKEN": "<long-lived access token>",
