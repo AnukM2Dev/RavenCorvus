@@ -53,6 +53,8 @@ class Settings:
     def ws_url(self) -> str:
         scheme = "wss" if self.url.startswith("https://") else "ws"
         host = self.url.split("://", 1)[1]
+        if host.endswith("/core"):  # HA Supervisor proxy (add-on): ws://supervisor/core/websocket
+            return f"{scheme}://{host}/websocket"
         return f"{scheme}://{host}/api/websocket"
 
     @classmethod

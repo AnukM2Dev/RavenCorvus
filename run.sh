@@ -10,8 +10,16 @@ HA_TOKEN="$(opt ha_token)"
 HOST="$(opt public_hostname)"
 SECRET="$(opt path_secret)"
 
+# Default: talk to Home Assistant through the Supervisor proxy (no long-lived token needed).
+if [ "$(opt use_supervisor_api)" != "false" ] && [ -n "${SUPERVISOR_TOKEN:-}" ]; then
+  HA_URL="http://supervisor/core"
+  HA_TOKEN="$SUPERVISOR_TOKEN"
+else
+  HA_URL="$(opt ha_url)"
+fi
+
 if [ -z "$TUNNEL_TOKEN" ] || [ -z "$HA_TOKEN" ] || [ -z "$HOST" ]; then
-  echo "ERROR: tunnel_token, ha_token and public_hostname must all be set in the add-on configuration." >&2
+  echo "ERROR: tunnel_token and public_hostname must be set (and ha_token when use_supervisor_api is off)." >&2
   exit 1
 fi
 
@@ -24,7 +32,7 @@ if [ -z "$SECRET" ]; then
   SECRET="$(cat /data/path_secret)"
 fi
 
-export HASS_URL="$(opt ha_url)"
+export HASS_URL="$HA_URL"
 export HASS_TOKEN="$HA_TOKEN"
 export HA_MCP_PATH_SECRET="$SECRET"
 export HA_MCP_ALLOWED_HOSTS="$HOST"

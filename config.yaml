@@ -1,5 +1,5 @@
 name: RavenCorvus
-version: "0.1.0"
+version: "0.1.1"
 slug: ravencorvus
 description: Home Assistant MCP server with a Cloudflare tunnel for remote access (claude.ai connector)
 url: https://github.com/AnukM2Dev/RavenCorvus
@@ -9,10 +9,12 @@ arch:
 startup: services
 boot: auto
 init: false
+homeassistant_api: true
 # No ports are exposed: cloudflared makes an outbound connection, and ha-mcp listens on 127.0.0.1 only.
 options:
   tunnel_token: ""
   ha_token: ""
+  use_supervisor_api: true
   ha_url: "http://homeassistant:8123"
   public_hostname: "rc.ravenswoodfarmstead.com"
   path_secret: ""
@@ -22,7 +24,8 @@ options:
   allow_sensitive_domains: ""
 schema:
   tunnel_token: password
-  ha_token: password
+  use_supervisor_api: bool
+  ha_token: password?
   ha_url: str
   public_hostname: str
   path_secret: password?

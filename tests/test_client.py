@@ -153,3 +153,7 @@ async def test_ws_connect_failure_is_typed(make_client):
 def test_ws_url_scheme_follows_http_scheme():
     assert make_settings(url="https://ha.example.com").ws_url == "wss://ha.example.com/api/websocket"
     assert make_settings(url="http://10.0.0.5:8123").ws_url == "ws://10.0.0.5:8123/api/websocket"
+
+
+def test_ws_url_for_supervisor_proxy():
+    assert make_settings(url="http://supervisor/core").ws_url == "ws://supervisor/core/websocket"
