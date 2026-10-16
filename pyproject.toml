@@ -1,6 +1,6 @@
 [project]
 name = "ravencorvus"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server and CLI for Home Assistant (REST + WebSocket) with an operator-controlled write guard"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ dependencies = [
 [project.scripts]
 ha-mcp = "ha_mcp.server:main"
 ha = "ha_mcp.cli:main"
+ha-watch = "ha_mcp.watch:main"
 
 [dependency-groups]
 dev = [

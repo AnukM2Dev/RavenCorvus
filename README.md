@@ -231,3 +231,11 @@ src/ha_mcp/
   server.py      MCP tool surface (ha-mcp)
   cli.py         the `ha` command
 ```
+
+## House watch (optional)
+
+Set `anthropic_api_key` (a console.anthropic.com key, `sk-ant-…`) in the add-on to enable `ha-watch`:
+twice a day (`watch_times`) a read-only Claude agent checks the house and sends a notification through
+`watch_notify_service` (e.g. `notify.mobile_app_yourphone`) only if something needs attention; nightly
+(`watch_nightly_time`) it rewrites a short "what's normal here" note in `/data/house_memory.md` that later
+checks use to avoid false alarms. Run one job on demand with `ha-watch --once watch` / `--once nightly`.

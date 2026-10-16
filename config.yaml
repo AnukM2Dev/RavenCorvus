@@ -1,5 +1,5 @@
 name: RavenCorvus
-version: "0.1.1"
+version: "0.2.0"
 slug: ravencorvus
 description: Home Assistant MCP server with a Cloudflare tunnel for remote access (claude.ai connector)
 url: https://github.com/AnukM2Dev/RavenCorvus
@@ -22,6 +22,11 @@ options:
   denied_entities: ""
   allowed_domains: ""
   allow_sensitive_domains: ""
+  anthropic_api_key: ""
+  watch_model: "claude-haiku-5-5"
+  watch_notify_service: ""
+  watch_times: "08:00,18:00"
+  watch_nightly_time: "03:00"
 schema:
   tunnel_token: password
   use_supervisor_api: bool
@@ -33,3 +38,8 @@ schema:
   denied_entities: str?
   allowed_domains: str?
   allow_sensitive_domains: str?
+  anthropic_api_key: password?
+  watch_model: str?
+  watch_notify_service: str?
+  watch_times: str?
+  watch_nightly_time: str?

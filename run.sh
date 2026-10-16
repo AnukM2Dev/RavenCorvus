@@ -51,6 +51,22 @@ MCP_PID=$!
 TUNNEL_TOKEN="$TUNNEL_TOKEN" cloudflared tunnel --no-autoupdate run &
 CF_PID=$!
 
+# Optional house watch (needs an Anthropic API key). Restarts itself; never takes the tunnel down.
+KEY="$(opt anthropic_api_key)"
+if [ -n "$KEY" ]; then
+  (
+    export ANTHROPIC_API_KEY="$KEY"
+    export WATCH_MODEL="$(opt watch_model)"
+    export WATCH_NOTIFY_SERVICE="$(opt watch_notify_service)"
+    export WATCH_TIMES="$(opt watch_times)"
+    export WATCH_NIGHTLY_TIME="$(opt watch_nightly_time)"
+    while true; do ha-watch || true; sleep 60; done
+  ) &
+  echo "House watch: enabled"
+else
+  echo "House watch: disabled (set anthropic_api_key to enable)"
+fi
+
 # If either process exits, stop the other and let the supervisor restart the add-on.
 trap 'kill "$MCP_PID" "$CF_PID" 2>/dev/null || true' TERM INT
 wait -n "$MCP_PID" "$CF_PID"
