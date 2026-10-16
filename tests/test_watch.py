@@ -125,3 +125,12 @@ def test_next_event_schedule():
     assert watch.next_event(datetime(2026, 10, 16, 7, 0, tzinfo=tz), c)[1:] == ("watch",)
     assert watch.next_event(datetime(2026, 10, 16, 19, 0, tzinfo=tz), c) == (
         datetime(2026, 10, 17, 3, 0, tzinfo=tz), "nightly")
+
+
+def test_base_url_override(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example.com/")
+    assert watch.WatchConfig.from_env().messages_url == "https://proxy.example.com/v1/messages"
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://insecure")
+    with pytest.raises(ConfigError):
+        watch.WatchConfig.from_env()

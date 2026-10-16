@@ -32,7 +32,7 @@ import httpx
 from .config import ConfigError, Settings
 from .ops import Operations
 
-API_URL = "https://api.anthropic.com/v1/messages"
+API_URL = "https://api.anthropic.com/v1/messages"  # overridden by ANTHROPIC_BASE_URL
 API_VERSION = "2023-06-01"
 DEFAULT_MODEL = "claude-haiku-5-5"
 MAX_TOOL_CHARS = 12000
@@ -139,6 +139,15 @@ def _times(raw: str, name: str) -> list[tuple[int, int]]:
     return sorted(set(out))
 
 
+def _base_url(raw: str) -> str:
+    raw = raw.strip().rstrip("/")
+    if not raw:
+        return ""
+    if not raw.startswith("https://"):
+        raise ConfigError("ANTHROPIC_BASE_URL must start with https://")
+    return raw
+
+
 @dataclass(frozen=True)
 class WatchConfig:
     api_key: str = field(repr=False)
@@ -148,6 +157,7 @@ class WatchConfig:
     nightly_time: tuple[int, int] = (3, 0)
     data_dir: Path = Path("/data")
     max_turns: int = 12
+    base_url: str = ""
 
     @classmethod
     def from_env(cls) -> "WatchConfig":
@@ -166,7 +176,14 @@ class WatchConfig:
             watch_times=times,
             nightly_time=nightly[0] if nightly else (3, 0),
             data_dir=Path(os.environ.get("WATCH_DATA_DIR", "/data")),
+            base_url=_base_url(os.environ.get("ANTHROPIC_BASE_URL", "")),
         )
+
+    @property
+    def messages_url(self) -> str:
+        if not self.base_url:
+            return API_URL
+        return self.base_url if self.base_url.endswith("/messages") else self.base_url + "/v1/messages"
 
     @property
     def memory_path(self) -> Path:
@@ -226,7 +243,7 @@ async def run_agent(
     messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
     for _ in range(cfg.max_turns):
         resp = await http.post(
-            API_URL,
+            cfg.messages_url,
             headers={
                 "x-api-key": cfg.api_key,
                 "anthropic-version": API_VERSION,
@@ -256,7 +273,7 @@ async def run_agent(
     # Out of turns: ask for a final answer without tools.
     messages.append({"role": "user", "content": "Out of tool budget. Give your final answer now."})
     resp = await http.post(
-        API_URL,
+        cfg.messages_url,
         headers={"x-api-key": cfg.api_key, "anthropic-version": API_VERSION, "content-type": "application/json"},
         json={"model": cfg.model, "max_tokens": 1000, "system": system, "messages": _text_only(messages)},
     )

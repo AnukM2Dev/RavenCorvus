@@ -56,6 +56,7 @@ KEY="$(opt anthropic_api_key)"
 if [ -n "$KEY" ]; then
   (
     export ANTHROPIC_API_KEY="$KEY"
+    export ANTHROPIC_BASE_URL="$(opt anthropic_base_url)"
     export WATCH_MODEL="$(opt watch_model)"
     export WATCH_NOTIFY_SERVICE="$(opt watch_notify_service)"
     export WATCH_TIMES="$(opt watch_times)"

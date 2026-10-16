@@ -23,6 +23,7 @@ options:
   allowed_domains: ""
   allow_sensitive_domains: ""
   anthropic_api_key: ""
+  anthropic_base_url: ""
   watch_model: "claude-haiku-5-5"
   watch_notify_service: ""
   watch_times: "08:00,18:00"
@@ -39,6 +40,7 @@ schema:
   allowed_domains: str?
   allow_sensitive_domains: str?
   anthropic_api_key: password?
+  anthropic_base_url: str?
   watch_model: str?
   watch_notify_service: str?
   watch_times: str?
