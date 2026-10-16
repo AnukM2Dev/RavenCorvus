@@ -130,6 +130,28 @@ command, args and environment are what matter.
 `homeassistant.local` will not resolve there. Treat an internet-reachable URL plus a token as sensitive and
 use a dedicated low-privilege user.
 
+## Remote access (StreamableHTTP)
+
+For claude.ai / the mobile app / cloud agents, run the HTTP transport and put a tunnel in front of it.
+It **refuses to start without authentication**:
+
+| Variable | Purpose |
+|---|---|
+| `HA_MCP_PATH_SECRET` | Endpoint is served at `/<secret>/mcp`, every other path is 404. Use this for claude.ai custom connectors (they cannot send headers). 16+ chars. |
+| `HA_MCP_AUTH_TOKEN` | Also require `Authorization: Bearer <token>`. For Claude Code / `mcp-remote` / curl. 16+ chars. |
+| `HA_MCP_ALLOWED_HOSTS` | Optional comma list of public hostnames for DNS-rebinding protection. |
+
+```bash
+python -c "import secrets;print(secrets.token_urlsafe(32))"   # generate a secret
+export HA_MCP_PATH_SECRET=...
+uv run ha-mcp --transport http --host 127.0.0.1 --port 8787
+# connector URL: https://ha-mcp.example.com/<secret>/mcp
+```
+
+Keep `--host 127.0.0.1`; the tunnel connects to it locally. Start with `HASS_READ_ONLY=1`.
+The secret is part of the URL, so treat the URL like a password and prefer adding Cloudflare Access
+or the bearer token on top.
+
 ## CLI
 
 ```bash

@@ -183,13 +183,29 @@ def build_server(ops: Operations | None = None, settings: Settings | None = None
     return mcp
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="ha-mcp", description="Home Assistant MCP server")
+    parser.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    parser.add_argument("--host", default="127.0.0.1", help="http only; keep 127.0.0.1 behind a tunnel")
+    parser.add_argument("--port", type=int, default=8787, help="http only")
+    args = parser.parse_args(argv)
+
     try:
         server = build_server()
+        if args.transport == "http":
+            from .http import HttpAuthConfig, serve
+
+            cfg = HttpAuthConfig.from_env()
     except ConfigError as exc:
         print(f"ha-mcp configuration error: {exc}", file=sys.stderr)
         sys.exit(2)
-    server.run(transport="stdio")
+
+    if args.transport == "http":
+        serve(server, cfg, args.host, args.port)
+    else:
+        server.run(transport="stdio")
 
 
 if __name__ == "__main__":
