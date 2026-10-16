@@ -152,6 +152,27 @@ Keep `--host 127.0.0.1`; the tunnel connects to it locally. Start with `HASS_REA
 The secret is part of the URL, so treat the URL like a password and prefer adding Cloudflare Access
 or the bearer token on top.
 
+## Home Assistant OS add-on (recommended for remote access)
+
+On Home Assistant OS there is no host shell, so RavenCorvus ships as a local add-on that runs `ha-mcp`
+(HTTP, loopback only) and `cloudflared` together. The repo root *is* the add-on (`config.yaml`,
+`Dockerfile`, `run.sh`).
+
+1. **Install:** with the Samba share add-on enabled, clone into the `addons` share:
+   `git clone -b http-transport https://github.com/AnukM2Dev/RavenCorvus.git \\homeassistant.local\addons\ravencorvus`
+   (or copy the repo folder there). In HA: Settings > Add-ons > Add-on store > menu > Check for updates;
+   RavenCorvus appears under *Local add-ons*. Install it.
+2. **Create a Cloudflare tunnel** (Zero Trust > Networks > Tunnels) with a published application routing your
+   hostname to `http://localhost:8787`, and copy its connector token.
+3. **Create an HA token:** profile > Security > Long-lived access tokens (preferably from a dedicated non-admin user).
+4. **Configure the add-on:** set `tunnel_token`, `ha_token`, `public_hostname`. Leave `path_secret` empty to have
+   one generated and kept across restarts. Leave `read_only` on to start.
+5. **Start it** and open the Log tab: it prints the connector URL `https://<host>/<secret>/mcp`.
+   Treat that URL like a password and add it in claude.ai under Settings > Connectors > Add custom connector.
+
+Options: `denied_entities`, `allowed_domains`, `allow_sensitive_domains` map to the `HASS_*` variables above.
+The add-on reaches HA at `http://homeassistant:8123` on the internal add-on network (`ha_url`).
+
 ## CLI
 
 ```bash
