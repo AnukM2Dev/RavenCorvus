@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from ha_mcp.config import ConfigError
-from ha_mcp.http_transport import HttpSettings, KeyGate, build_http_app
+from ha_mcp.http_transport import AccessVerifier, HttpSettings, KeyGate, build_http_app
 from ha_mcp.server import build_server
 
 KEY = "k" * 40
@@ -31,10 +31,28 @@ def test_settings_reject_unsafe_key():
 def test_settings_defaults_and_overrides():
     s = HttpSettings.from_env({"RAVEN_API_KEY": KEY})
     assert (s.host, s.port, s.path, s.allowed_hosts) == ("0.0.0.0", 8765, "/mcp", [])
+    assert s.path_key is False and s.access_enabled is False
     s = HttpSettings.from_env(
         {"RAVEN_API_KEY": KEY, "RAVEN_PORT": "9000", "RAVEN_ALLOWED_HOSTS": "a.com, b.com"}
     )
     assert s.port == 9000 and s.allowed_hosts == ["a.com", "b.com"]
+
+
+def test_settings_access_needs_both_values():
+    with pytest.raises(ConfigError, match="both"):
+        HttpSettings.from_env({"RAVEN_API_KEY": KEY, "RAVEN_ACCESS_TEAM": "ravenswood"})
+
+
+@pytest.mark.parametrize(
+    "team", ["ravenswood", "ravenswood.cloudflareaccess.com", "https://ravenswood.cloudflareaccess.com/"]
+)
+def test_settings_access_issuer_normalized(team):
+    s = HttpSettings.from_env({"RAVEN_API_KEY": KEY, "RAVEN_ACCESS_TEAM": team, "RAVEN_ACCESS_AUD": "a"})
+    assert s.access_enabled and s.access_issuer == "https://ravenswood.cloudflareaccess.com"
+
+
+def test_settings_path_key_opt_in():
+    assert HttpSettings.from_env({"RAVEN_API_KEY": KEY, "RAVEN_PATH_KEY": "1"}).path_key
 
 
 def test_settings_bad_port():
@@ -51,8 +69,9 @@ async def echo_app(scope, receive, send):
     await send({"type": "http.response.body", "body": body})
 
 
-def gate_client():
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=KeyGate(echo_app, KEY)), base_url="http://t")
+def gate_client(**kw):
+    kw.setdefault("path_key", True)
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=KeyGate(echo_app, KEY, **kw)), base_url="http://t")
 
 
 async def test_healthz_is_open():
@@ -75,6 +94,18 @@ async def test_healthz_is_open():
 async def test_gate_rejects(path, headers):
     async with gate_client() as c:
         r = await c.post(path, headers=headers)
+    assert r.status_code == 401
+
+
+async def test_401_carries_www_authenticate():
+    async with gate_client() as c:
+        r = await c.post("/mcp")
+    assert r.status_code == 401 and r.headers["www-authenticate"].startswith("Bearer")
+
+
+async def test_path_key_off_by_default():
+    async with gate_client(path_key=False) as c:
+        r = await c.post(f"/{KEY}/mcp")
     assert r.status_code == 401
 
 
@@ -131,7 +162,7 @@ async def running(app):
 
 
 async def test_end_to_end_initialize_and_list_tools(make_ops):
-    app = build_http_app(build_server(make_ops()), HttpSettings(api_key=KEY))
+    app = build_http_app(build_server(make_ops()), HttpSettings(api_key=KEY, path_key=True))
 
     async with running(app) as post:
         r = await post("/mcp", INIT)
@@ -153,8 +184,80 @@ async def test_end_to_end_initialize_and_list_tools(make_ops):
 
 async def test_allowed_hosts_enforced(make_ops):
     app = build_http_app(
-        build_server(make_ops()), HttpSettings(api_key=KEY, allowed_hosts=["mcp.good.com"])
+        build_server(make_ops()), HttpSettings(api_key=KEY, path_key=True, allowed_hosts=["mcp.good.com"])
     )
     async with running(app) as post:
         r = await post(f"/{KEY}/mcp", INIT)  # Host: mcp.example.com
     assert r.status_code in (400, 421)
+
+
+# --- Cloudflare Access JWT ---------------------------------------------------
+
+ISSUER = "https://ravenswood.cloudflareaccess.com"
+AUD = "aud-tag-123"
+
+
+@pytest.fixture(scope="module")
+def rsa_keys():
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    good = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    bad = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return good, bad
+
+
+class _StaticJWKS:
+    def __init__(self, public_key):
+        self.public_key = public_key
+
+    def get_signing_key_from_jwt(self, token):
+        return type("K", (), {"key": self.public_key})()
+
+
+def _token(private_key, **over):
+    import time
+
+    import jwt
+
+    claims = {"iss": ISSUER, "aud": [AUD], "iat": int(time.time()), "exp": int(time.time()) + 300,
+              "email": "mike@example.com"}
+    claims.update(over)
+    return jwt.encode(claims, private_key, algorithm="RS256")
+
+
+def access_client(rsa_keys):
+    good, _ = rsa_keys
+    verifier = AccessVerifier(ISSUER, AUD, jwks_client=_StaticJWKS(good.public_key()))
+    return gate_client(path_key=False, verifier=verifier)
+
+
+async def test_access_jwt_accepted(rsa_keys):
+    async with access_client(rsa_keys) as c:
+        r = await c.post("/mcp", headers={"Cf-Access-Jwt-Assertion": _token(rsa_keys[0])})
+    assert r.status_code == 200 and r.json()["path"] == "/mcp"
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["wrong_key", "wrong_aud", "wrong_iss", "expired", "garbage"],
+)
+async def test_access_jwt_rejected(rsa_keys, case):
+    import time
+
+    good, bad = rsa_keys
+    token = {
+        "wrong_key": lambda: _token(bad),
+        "wrong_aud": lambda: _token(good, aud=["other"]),
+        "wrong_iss": lambda: _token(good, iss="https://evil.cloudflareaccess.com"),
+        "expired": lambda: _token(good, iat=int(time.time()) - 900, exp=int(time.time()) - 600),
+        "garbage": lambda: "not.a.jwt",
+    }[case]()
+    async with access_client(rsa_keys) as c:
+        r = await c.post("/mcp", headers={"Cf-Access-Jwt-Assertion": token})
+    assert r.status_code == 401
+
+
+async def test_bearer_still_works_with_access_enabled(rsa_keys):
+    async with access_client(rsa_keys) as c:
+        r = await c.post("/mcp", headers={"Authorization": f"Bearer {KEY}"})
+    assert r.status_code == 200
