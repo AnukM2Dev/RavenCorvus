@@ -1,4 +1,4 @@
-"""MCP server. Run with ``ha-mcp`` (stdio) or ``ha-mcp --transport http`` (remote).
+"""MCP server (stdio). Run with ``ha-mcp`` or ``python -m ha_mcp.server``.
 
 Write tools are not registered at all when HASS_READ_ONLY is set, so an agent
 never sees an action it cannot take.
@@ -149,42 +149,8 @@ def build_server(ops: Operations | None = None, settings: Settings | None = None
         """Tail of Home Assistant's error log (last `lines` lines)."""
         return await ops.get_error_log(lines=lines)
 
-    # ------------------------------------------------------------------ diagnostics
-    @tool
-    async def check_config() -> dict:
-        """Validate Home Assistant's configuration (same as Developer tools > Check configuration).
-        Run this after editing YAML and before reloading. `result` is 'valid' or 'invalid'."""
-        return await ops.check_config()
-
-    @tool
-    async def get_automation_config(entity_id: str) -> dict:
-        """The stored configuration (triggers, conditions, actions) of one automation,
-        e.g. entity_id='automation.night_path'."""
-        return await ops.get_automation_config(entity_id)
-
-    @tool
-    async def list_automation_traces(entity_id: str, limit: int = 10) -> dict:
-        """Recent runs of an automation, newest first: when it ran, what triggered it, whether it
-        finished, and the last step reached. Use the run_id with get_automation_trace."""
-        return await ops.list_automation_traces(entity_id, limit=limit)
-
-    @tool
-    async def get_automation_trace(
-        entity_id: str, run_id: str | None = None, max_steps: int = 60
-    ) -> dict:
-        """Step-by-step trace of one automation run (latest if run_id is omitted): the trigger,
-        each condition's result, each action, and any error. Read this before changing an
-        automation that 'didn't work'."""
-        return await ops.get_automation_trace(entity_id, run_id=run_id, max_steps=max_steps)
-
     # ------------------------------------------------------------------ write
     if not settings.read_only:
-
-        @tool
-        async def create_backup() -> dict:
-            """Start a Home Assistant backup using HA's own backup settings. Do this before bulk
-            edits (mass renames, dashboard rewrites, removing integrations)."""
-            return await ops.create_backup()
 
         @tool
         async def call_service(
@@ -217,42 +183,14 @@ def build_server(ops: Operations | None = None, settings: Settings | None = None
     return mcp
 
 
-def main(argv: list[str] | None = None) -> None:
-    import argparse
-    import os
-
-    parser = argparse.ArgumentParser(prog="ha-mcp", description="RavenCorvus Home Assistant MCP server")
-    parser.add_argument(
-        "--transport",
-        choices=["stdio", "http"],
-        default=os.environ.get("RAVEN_TRANSPORT", "stdio"),
-        help="stdio (default, local clients) or http (remote, needs RAVEN_API_KEY)",
-    )
-    parser.add_argument("--host", help="http bind address (env RAVEN_HOST, default 0.0.0.0)")
-    parser.add_argument("--port", type=int, help="http port (env RAVEN_PORT, default 8765)")
-    args = parser.parse_args(argv)
-
+def main() -> None:
     try:
         server = build_server()
-        if args.transport == "http":
-            from dataclasses import replace
-
-            from .http_transport import HttpSettings, serve
-
-            http = HttpSettings.from_env()
-            if args.host:
-                http = replace(http, host=args.host)
-            if args.port:
-                http = replace(http, port=args.port)
     except ConfigError as exc:
         print(f"ha-mcp configuration error: {exc}", file=sys.stderr)
         sys.exit(2)
+    server.run(transport="stdio")
 
-    if args.transport == "http":
-        print(f"ha-mcp: serving streamable HTTP on {http.host}:{http.port}{http.path}", file=sys.stderr)
-        serve(server, http)
-    else:
-        server.run(transport="stdio")
 
 if __name__ == "__main__":
     main()

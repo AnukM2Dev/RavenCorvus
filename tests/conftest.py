@@ -82,27 +82,6 @@ class FakeHA:
             {"entity_id": "light.bedroom", "device_id": None, "area_id": "bedroom"},
         ]
         self.fail_with: int | None = None  # force every REST call to this status
-        self.config_check = {"result": "valid", "errors": None, "warnings": None}
-        self.backup_services = {("backup", "create_automatic")}
-        self.backups_made: list[str] = []
-        self.traces = [
-            {
-                "run_id": "r1",
-                "state": "stopped",
-                "script_execution": "finished",
-                "last_step": "action/0",
-                "trigger": "state of binary_sensor.bedroom_exit",
-                "timestamp": {"start": "2026-10-24T02:00:00+00:00", "finish": "2026-10-24T02:00:01+00:00"},
-            },
-            {
-                "run_id": "r2",
-                "state": "stopped",
-                "script_execution": "failed_conditions",
-                "last_step": "condition/0",
-                "trigger": "state of binary_sensor.bedroom_exit",
-                "timestamp": {"start": "2026-10-24T03:00:00+00:00", "finish": "2026-10-24T03:00:00+00:00"},
-            },
-        ]
 
     # ------------------------------------------------------------- REST
     def handler(self, request: httpx.Request) -> httpx.Response:
@@ -186,8 +165,6 @@ class FakeHA:
         if path == "/template" and method == "POST":
             tpl = json.loads(request.content)["template"]
             return httpx.Response(200, text=f"rendered:{tpl}")
-        if path == "/config/core/check_config" and method == "POST":
-            return httpx.Response(200, json=self.config_check)
         if path == "/error_log" and method == "GET":
             return httpx.Response(200, text="\n".join(f"line {i}" for i in range(500)))
         if (m := re.fullmatch(r"/events/(.+)", path)) and method == "POST":
@@ -195,11 +172,6 @@ class FakeHA:
         return httpx.Response(404, text=f"no route {method} {path}")
 
     def _service(self, domain: str, service: str, request: httpx.Request) -> httpx.Response:
-        if domain in ("backup", "hassio"):
-            if (domain, service) not in self.backup_services:
-                return httpx.Response(400, json={"message": f"Service {domain}.{service} not found."})
-            self.backups_made.append(f"{domain}.{service}")
-            return httpx.Response(200, json=[])
         target = TRANSITIONS.get((domain, service))
         if target is None:
             return httpx.Response(404, json={"message": "Service not found."})
@@ -249,23 +221,6 @@ class FakeWS:
             "config/area_registry/list": self.ha.areas,
             "config/device_registry/list": self.ha.devices,
             "config/entity_registry/list": self.ha.entity_registry,
-            "automation/config": {"config": {"id": "1700000000001", "alias": "Night Path",
-                                             "triggers": [{"trigger": "state"}], "actions": []}},
-            "trace/list": self.ha.traces,
-            "trace/get": {
-                "run_id": msg.get("run_id"),
-                "state": "stopped",
-                "script_execution": "failed_conditions",
-                "trigger": "state of binary_sensor.bedroom_exit",
-                "timestamp": {"start": "2026-10-24T03:00:00+00:00"},
-                "context": {"id": "ctx1"},
-                "trace": {
-                    "trigger/0": [{"timestamp": "2026-10-24T03:00:00.001+00:00",
-                                   "changed_variables": {"trigger": {}}}],
-                    "condition/0": [{"timestamp": "2026-10-24T03:00:00.002+00:00",
-                                     "result": {"result": False, "entities": ["sun.sun"]}}],
-                },
-            },
         }
         if msg["type"] in results:
             self.queue.append(

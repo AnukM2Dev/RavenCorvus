@@ -16,12 +16,8 @@ READ_TOOLS = {
     "get_logbook",
     "render_template",
     "get_error_log",
-    "check_config",
-    "get_automation_config",
-    "list_automation_traces",
-    "get_automation_trace",
 }
-WRITE_TOOLS = {"call_service", "set_state", "fire_event", "create_backup"}
+WRITE_TOOLS = {"call_service", "set_state", "fire_event"}
 
 
 def payload(result):

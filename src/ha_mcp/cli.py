@@ -108,22 +108,6 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("error-log", help="tail the error log")
     s.add_argument("--lines", type=int, default=100)
 
-    sub.add_parser("check-config", help="validate HA configuration")
-
-    s = sub.add_parser("automation", help="an automation's stored config")
-    s.add_argument("entity_id")
-
-    s = sub.add_parser("traces", help="recent runs of an automation")
-    s.add_argument("entity_id")
-    s.add_argument("--limit", type=int, default=10)
-
-    s = sub.add_parser("trace", help="step-by-step trace of one automation run")
-    s.add_argument("entity_id")
-    s.add_argument("--run-id", help="defaults to the latest run")
-    s.add_argument("--max-steps", type=int, default=60)
-
-    sub.add_parser("backup", help="start a Home Assistant backup")
-
     s = sub.add_parser("call", help="call a service")
     s.add_argument("domain")
     s.add_argument("service")
@@ -183,22 +167,6 @@ async def run(args: argparse.Namespace, ops: Operations) -> None:
         _emit(await ops.render_template(text), fmt)
     elif cmd == "error-log":
         _emit(await ops.get_error_log(lines=args.lines), fmt)
-    elif cmd == "check-config":
-        _emit(await ops.check_config(), "json")
-    elif cmd == "automation":
-        _emit(await ops.get_automation_config(args.entity_id), "json")
-    elif cmd == "traces":
-        data = await ops.list_automation_traces(args.entity_id, limit=args.limit)
-        _emit(data, fmt, ["run_id", "start", "result", "last_step"], "runs")
-    elif cmd == "trace":
-        _emit(
-            await ops.get_automation_trace(
-                args.entity_id, run_id=args.run_id, max_steps=args.max_steps
-            ),
-            "json",
-        )
-    elif cmd == "backup":
-        _emit(await ops.create_backup(), "json")
     elif cmd == "call":
         data = _json_arg(args.data, "--data")
         if args.entity:
