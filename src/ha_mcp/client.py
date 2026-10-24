@@ -205,6 +205,9 @@ class HAClient:
         resp = await self._request("GET", "/error_log")
         return resp.text
 
+    async def check_config(self) -> dict[str, Any]:
+        return await self._json("POST", "/config/core/check_config")
+
     # ------------------------------------------------------------------ write: REST
     # NOTE: these methods do not enforce policy. The server/CLI call
     # safety.WriteGuard first, so the guard can be tested in isolation.
@@ -300,6 +303,17 @@ class HAClient:
 
     async def ws_command(self, msg_type: str, **payload: Any) -> Any:
         return (await self.ws_commands([(msg_type, payload)]))[0]
+
+    # ------------------------------------------------------------------ automations / traces
+    async def automation_config(self, entity_id: str) -> dict[str, Any]:
+        result = await self.ws_command("automation/config", entity_id=entity_id)
+        return (result or {}).get("config", result or {})
+
+    async def list_traces(self, domain: str, item_id: str) -> list[dict[str, Any]]:
+        return await self.ws_command("trace/list", domain=domain, item_id=item_id) or []
+
+    async def get_trace(self, domain: str, item_id: str, run_id: str) -> dict[str, Any]:
+        return await self.ws_command("trace/get", domain=domain, item_id=item_id, run_id=run_id)
 
     # ------------------------------------------------------------------ registries
     async def list_areas(self) -> list[dict[str, Any]]:

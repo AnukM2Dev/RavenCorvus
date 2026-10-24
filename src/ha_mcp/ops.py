@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .client import HAClient, HANotFoundError
+from .client import HABadRequestError, HAError, HAClient, HANotFoundError
 from .config import Settings
 from .formatting import (
     compact_history,
@@ -166,6 +166,53 @@ class Operations:
     async def get_error_log(self, *, lines: int = 100) -> str:
         return tail_text(await self.client.get_error_log(), lines=lines)
 
+    # ================================================================== diagnostics
+    async def check_config(self) -> dict[str, Any]:
+        raw = await self.client.check_config()
+        return {
+            "result": raw.get("result"),
+            "errors": raw.get("errors"),
+            "warnings": raw.get("warnings"),
+        }
+
+    async def _automation_item_id(self, entity_id: str) -> str:
+        if not entity_id.startswith("automation."):
+            raise HAError(f"{entity_id} is not an automation entity")
+        state = await self.client.get_state(entity_id)
+        item_id = (state.get("attributes") or {}).get("id")
+        if not item_id:
+            raise HAError(
+                f"{entity_id} has no 'id' attribute. Only automations created in the UI or given "
+                "an 'id:' in YAML keep traces."
+            )
+        return str(item_id)
+
+    async def get_automation_config(self, entity_id: str) -> dict[str, Any]:
+        return {"entity_id": entity_id, "config": await self.client.automation_config(entity_id)}
+
+    async def list_automation_traces(self, entity_id: str, *, limit: int = 10) -> dict[str, Any]:
+        item_id = await self._automation_item_id(entity_id)
+        runs = await self.client.list_traces("automation", item_id)
+        runs = sorted(runs, key=lambda r: (r.get("timestamp") or {}).get("start", ""), reverse=True)
+        return {
+            "entity_id": entity_id,
+            "item_id": item_id,
+            "runs": [_compact_run(r) for r in runs[: max(1, limit)]],
+            "total": len(runs),
+        }
+
+    async def get_automation_trace(
+        self, entity_id: str, *, run_id: str | None = None, max_steps: int = 60
+    ) -> dict[str, Any]:
+        item_id = await self._automation_item_id(entity_id)
+        if not run_id:
+            listing = await self.list_automation_traces(entity_id, limit=1)
+            if not listing["runs"]:
+                raise HAError(f"No stored traces for {entity_id} yet. Trigger it, then try again.")
+            run_id = listing["runs"][0]["run_id"]
+        raw = await self.client.get_trace("automation", item_id, run_id)
+        return _compact_trace(entity_id, raw, max_steps=max_steps)
+
     # ================================================================== write
     async def _before_states(self, entity_ids: list[str]) -> dict[str, dict[str, Any]]:
         before: dict[str, dict[str, Any]] = {}
@@ -246,12 +293,79 @@ class Operations:
             "note": "set_state only edits Home Assistant's state machine; it does not command the device.",
         }
 
+    async def create_backup(self) -> dict[str, Any]:
+        """Ask Home Assistant to make a backup using its own backup settings."""
+        attempts = [("backup", "create_automatic"), ("hassio", "backup_full")]
+        last: Exception | None = None
+        for domain, service in attempts:
+            self.guard.check_service(domain, service, None).raise_if_blocked()
+            try:
+                await self.client.call_service(domain, service, None)
+            except (HANotFoundError, HABadRequestError) as exc:
+                last = exc
+                continue
+            return {
+                "called": f"{domain}.{service}",
+                "note": "Backup started. It runs in the background; check Settings > System > Backups.",
+            }
+        raise HAError(f"No backup service available on this instance ({last})")
+
     async def fire_event(
         self, event_type: str, *, data: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         self.guard.check_fire_event(event_type).raise_if_blocked()
         result = await self.client.fire_event(event_type, data)
         return {"event_type": event_type, "result": result}
+
+
+def _compact_run(r: dict[str, Any]) -> dict[str, Any]:
+    ts = r.get("timestamp") or {}
+    out = {
+        "run_id": r.get("run_id"),
+        "start": ts.get("start"),
+        "finish": ts.get("finish"),
+        "state": r.get("state"),
+        "result": r.get("script_execution"),
+        "last_step": r.get("last_step"),
+        "trigger": r.get("trigger"),
+    }
+    if r.get("error"):
+        out["error"] = r["error"]
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _compact_trace(entity_id: str, raw: dict[str, Any], *, max_steps: int) -> dict[str, Any]:
+    steps: list[dict[str, Any]] = []
+    for path, entries in (raw.get("trace") or {}).items():
+        for e in entries or []:
+            step: dict[str, Any] = {"path": path, "at": e.get("timestamp")}
+            res = e.get("result")
+            if isinstance(res, dict):
+                for key in ("result", "enabled", "conditions", "params", "response", "running_script"):
+                    if key in res:
+                        step[key] = res[key]
+            elif res is not None:
+                step["result"] = res
+            if e.get("error"):
+                step["error"] = e["error"]
+            steps.append(step)
+    steps.sort(key=lambda s: s.get("at") or "")
+    ctx = raw.get("context") or {}
+    ts = raw.get("timestamp") or {}
+    out = {
+        "entity_id": entity_id,
+        "run_id": raw.get("run_id"),
+        "start": ts.get("start"),
+        "finish": ts.get("finish"),
+        "state": raw.get("state"),
+        "result": raw.get("script_execution"),
+        "trigger": raw.get("trigger"),
+        "error": raw.get("error"),
+        "context_id": ctx.get("id"),
+        "steps": steps[:max_steps],
+        "steps_truncated": len(steps) > max_steps,
+    }
+    return {k: v for k, v in out.items() if v is not None}
 
 
 __all__ = ["Operations", "GuardError"]

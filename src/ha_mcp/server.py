@@ -149,8 +149,42 @@ def build_server(ops: Operations | None = None, settings: Settings | None = None
         """Tail of Home Assistant's error log (last `lines` lines)."""
         return await ops.get_error_log(lines=lines)
 
+    # ------------------------------------------------------------------ diagnostics
+    @tool
+    async def check_config() -> dict:
+        """Validate Home Assistant's configuration (same as Developer tools > Check configuration).
+        Run this after editing YAML and before reloading. `result` is 'valid' or 'invalid'."""
+        return await ops.check_config()
+
+    @tool
+    async def get_automation_config(entity_id: str) -> dict:
+        """The stored configuration (triggers, conditions, actions) of one automation,
+        e.g. entity_id='automation.night_path'."""
+        return await ops.get_automation_config(entity_id)
+
+    @tool
+    async def list_automation_traces(entity_id: str, limit: int = 10) -> dict:
+        """Recent runs of an automation, newest first: when it ran, what triggered it, whether it
+        finished, and the last step reached. Use the run_id with get_automation_trace."""
+        return await ops.list_automation_traces(entity_id, limit=limit)
+
+    @tool
+    async def get_automation_trace(
+        entity_id: str, run_id: str | None = None, max_steps: int = 60
+    ) -> dict:
+        """Step-by-step trace of one automation run (latest if run_id is omitted): the trigger,
+        each condition's result, each action, and any error. Read this before changing an
+        automation that 'didn't work'."""
+        return await ops.get_automation_trace(entity_id, run_id=run_id, max_steps=max_steps)
+
     # ------------------------------------------------------------------ write
     if not settings.read_only:
+
+        @tool
+        async def create_backup() -> dict:
+            """Start a Home Assistant backup using HA's own backup settings. Do this before bulk
+            edits (mass renames, dashboard rewrites, removing integrations)."""
+            return await ops.create_backup()
 
         @tool
         async def call_service(
