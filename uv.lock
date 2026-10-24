@@ -663,11 +663,12 @@ wheels = [
 
 [[package]]
 name = "ravencorvus"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "mcp" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -682,6 +683,7 @@ dev = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.2" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.8" },
     { name = "uvicorn", specifier = ">=0.30" },
     { name = "websockets", specifier = ">=13" },
 ]
