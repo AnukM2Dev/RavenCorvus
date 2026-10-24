@@ -6,7 +6,7 @@ description: Use when working on the farmhouse Home Assistant (RavenCorvus) — 
 # RavenCorvus — Farmhouse Home Assistant
 
 Home Assistant OS on an HP desktop (i5-7500, 8 GB) at the farmhouse. Everything on that box runs as an HA app (add-on) — never a Windows service.
-Live access: the **RavenCorvus** MCP connector (ha-mcp) at `mcp.ravenswoodfarmstead.com`, behind Cloudflare Tunnel + Access.
+Live access: the **RavenCorvus** MCP connector at `https://mcp.ravenswoodfarmstead.com/mcp` (the RavenCorvus add-on, behind Cloudflare Tunnel + Access). Locally: the `ha` CLI.
 Config history: `github.com/AnukM2Dev/RavenCorvus` (private).
 
 ## Tool split
@@ -20,17 +20,19 @@ Config history: `github.com/AnukM2Dev/RavenCorvus` (private).
 1. **Discover**: list the relevant entities/areas over MCP and confirm IDs and current state.
 2. **Plan**: state the trigger → conditions → actions in one short block before writing YAML.
 3. **Write**: produce the automation/script/dashboard YAML. Use `mode:` explicitly and give it a clear `alias` and `id`.
-4. **Validate**: run a config check (`ha core check` or the MCP config-check tool) before any reload.
+4. **Validate**: run `check_config` (CLI: `ha check-config`) before any reload. Stop if `result` is `invalid`.
 5. **Apply**: reload the specific domain (automation/script/template), not a full restart, unless required.
-6. **Test**: trigger it (or simulate the state) and **read the trace**. Do not call it done until the trace shows the expected path.
+6. **Test**: trigger it (or simulate the state), then `list_automation_traces` → `get_automation_trace`. Do not call it done until the trace shows the expected path.
 7. **Commit**: commit to the repo with a message that names what changed and why.
 
 ## Hard safety rules
 
 - `lock.unlock`, `lock.open`, `alarm_control_panel.alarm_disarm`, and anything that turns cameras **off** require explicit per-call confirmation from Mike. Never batch them or auto-run them.
 - Never disable the PANIC automation, Frigate recording on alarm, or the alarm panel without being asked.
-- Take/confirm a backup before bulk edits (renames across many entities, dashboard rewrites, integration removal).
-- Debug from the trace first. Don't rewrite an automation that a trace could explain.
+- Run `create_backup` before bulk edits (renames across many entities, dashboard rewrites, integration removal).
+- If a call comes back `BLOCKED`, report which setting would allow it. Never try to route around the guard (e.g. via scripts or events).
+- Debug from the trace first (`get_automation_trace`, then `get_automation_config`). Don't rewrite an automation that a trace could explain.
+- Use `call_service` with `dry_run=true` when unsure whether a call is allowed or which entities it hits.
 
 ## House conventions (current)
 

@@ -49,6 +49,31 @@ Assistant's own permissions back up the settings below.
 | `HASS_DENIED_ENTITIES` | none | Comma list of entity ids or globs (`lock.*`, `switch.server_*`) that are never written |
 | `HASS_ALLOW_SENSITIVE_DOMAINS` | none | Opt in to sensitive domains: a comma list (`climate,cover`) or `all` |
 
+## Remote use (streamable HTTP)
+
+```bash
+RAVEN_API_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(32))") \
+  uv run ha-mcp --transport http --port 8765
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RAVEN_TRANSPORT` | `stdio` | `http` serves MCP at `/mcp` |
+| `RAVEN_API_KEY` | required for http | 32+ URL-safe chars, sent as `Authorization: Bearer` |
+| `RAVEN_HOST` / `RAVEN_PORT` | `0.0.0.0` / `8765` | Bind address |
+| `RAVEN_ACCESS_TEAM` / `RAVEN_ACCESS_AUD` | unset | Accept Cloudflare Access sign-ins (verifies `Cf-Access-Jwt-Assertion`) |
+| `RAVEN_ALLOWED_HOSTS` | unset | Reject other `Host` headers |
+| `RAVEN_PATH_KEY` | off | Also accept `/<key>/mcp`. Not recommended: URLs end up in logs |
+
+`GET /healthz` is unauthenticated and returns `ok`. Access logging is off.
+To run it on Home Assistant OS, use the add-on in `addon/ravencorvus` and follow `docs/SETUP.md`.
+
+## Diagnostics tools
+
+`check_config`, `get_automation_config`, `list_automation_traces` and `get_automation_trace` (read), and
+`create_backup` (write). In the CLI: `ha check-config`, `ha automation`, `ha traces`, `ha trace` and
+`ha backup`. Traces need the automation to have an `id` (UI-created, or `id:` in YAML).
+
 ## Safety model
 
 The default posture is permissive for ordinary domains but blocks sensitive ones until the operator opts in,
