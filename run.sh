@@ -36,12 +36,24 @@ export HASS_URL="$HA_URL"
 export HASS_TOKEN="$HA_TOKEN"
 export HA_MCP_PATH_SECRET="$SECRET"
 export HA_MCP_ALLOWED_HOSTS="$HOST"
+ACCESS_TEAM="$(opt access_team)"
+ACCESS_AUD="$(opt access_aud)"
+if [ -n "$ACCESS_TEAM" ] && [ -n "$ACCESS_AUD" ]; then
+  export HA_MCP_ACCESS_TEAM="$ACCESS_TEAM"
+  export HA_MCP_ACCESS_AUD="$ACCESS_AUD"
+fi
 [ "$(opt read_only)" = "true" ] && export HASS_READ_ONLY=1
 export HASS_DENIED_ENTITIES="$(opt denied_entities)"
 export HASS_ALLOWED_DOMAINS="$(opt allowed_domains)"
 export HASS_ALLOW_SENSITIVE_DOMAINS="$(opt allow_sensitive_domains)"
 
-echo "RavenCorvus connector URL (keep private): https://${HOST}/${SECRET}/mcp"
+if [ -n "${HA_MCP_ACCESS_TEAM:-}" ]; then
+  echo "Auth: Cloudflare Access (${ACCESS_TEAM}). Connector URL: https://${HOST}/mcp"
+else
+  # Without Access the secret path is the credential; it is shown once per start so it can be copied.
+  echo "Auth: path secret. Connector URL (keep private): https://${HOST}/${SECRET}/mcp"
+  echo "Tip: set access_team/access_aud to sign in through Cloudflare Access instead."
+fi
 if [ "${HASS_READ_ONLY:-}" = "1" ]; then echo "Mode: READ-ONLY"; else echo "Mode: READ/WRITE (guard active)"; fi
 
 ha-mcp --transport http --host 127.0.0.1 --port 8787 &
