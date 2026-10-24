@@ -1,0 +1,31 @@
+configuration:
+  ha_token:
+    name: Home Assistant token
+    description: Long-lived access token from a dedicated non-admin user. HA's own permissions then back up the guard.
+  api_key:
+    name: API key
+    description: 32+ URL-safe characters. Clients send it as "Authorization Bearer". Generate with python -c "import secrets;print(secrets.token_urlsafe(32))".
+  access_team:
+    name: Cloudflare Access team
+    description: Your Zero Trust team name (e.g. "ravenswood"). Set with the AUD tag to accept Access sign-ins.
+  access_aud:
+    name: Cloudflare Access AUD tag
+    description: Application Audience (AUD) tag from the Access application's Overview tab.
+  read_only:
+    name: Read only
+    description: Remove every write tool.
+  allowed_domains:
+    name: Allowed domains
+    description: If set, only these domains can be written. Never unlocks a sensitive domain.
+  denied_entities:
+    name: Denied entities
+    description: Entity ids or globs that are never written. Beats every opt-in.
+  allow_sensitive_domains:
+    name: Allow sensitive domains
+    description: Opt in to lock, alarm_control_panel, cover, climate or valve. Leave empty unless you mean it.
+  allowed_hosts:
+    name: Allowed hosts
+    description: Reject requests whose Host header is not listed (e.g. mcp.ravenswoodfarmstead.com).
+  path_key:
+    name: Path key (not recommended)
+    description: Also accept the key as a URL path prefix. Credentials in URLs end up in logs.
