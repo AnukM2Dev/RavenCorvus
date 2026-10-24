@@ -1,5 +1,5 @@
 name: RavenCorvus
-version: "0.3.0"
+version: "0.3.1"
 slug: ravencorvus
 description: Home Assistant MCP server with a Cloudflare tunnel for remote access (claude.ai connector)
 url: https://github.com/AnukM2Dev/RavenCorvus

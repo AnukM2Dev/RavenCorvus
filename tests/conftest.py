@@ -188,6 +188,8 @@ class FakeHA:
             return httpx.Response(200, text=f"rendered:{tpl}")
         if path == "/config/core/check_config" and method == "POST":
             return httpx.Response(200, json=self.config_check)
+        if path == "/error_log" and method == "GET" and getattr(self, "error_log_missing", False):
+            return httpx.Response(404, text="404: Not Found")
         if path == "/error_log" and method == "GET":
             return httpx.Response(200, text="\n".join(f"line {i}" for i in range(500)))
         if (m := re.fullmatch(r"/events/(.+)", path)) and method == "POST":
@@ -252,6 +254,12 @@ class FakeWS:
             "automation/config": {"config": {"id": "1700000000001", "alias": "Night Path",
                                              "triggers": [{"trigger": "state"}], "actions": []}},
             "trace/list": self.ha.traces,
+            "system_log/list": [
+                {"name": "homeassistant.components.tuya", "message": ["Device offline"], "level": "WARNING",
+                 "timestamp": 1792850000.0, "count": 3},
+                {"name": "custom_components.frigate", "message": ["Camera stream lost"], "level": "ERROR",
+                 "timestamp": 1792840000.0, "count": 1},
+            ],
             "trace/get": {
                 "run_id": msg.get("run_id"),
                 "state": "stopped",

@@ -84,6 +84,23 @@ def _iso(dt: datetime) -> str:
 
 
 # --------------------------------------------------------------------------- client
+def format_system_log(entries: list[dict[str, Any]]) -> str:
+    """Render system_log/list entries oldest-first, one line each (newest at the bottom)."""
+    from datetime import datetime, timezone
+
+    rows = []
+    for e in entries:
+        ts = e.get("timestamp") or 0
+        when = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        msg = e.get("message") or [""]
+        text = msg[0] if isinstance(msg, list) and msg else str(msg)
+        count = e.get("count") or 1
+        rows.append((ts, f"{when} {e.get('level', '')} ({e.get('name', '')}) {text}"
+                         + (f" [x{count}]" if count > 1 else "")))
+    rows.sort(key=lambda r: r[0])
+    return "\n".join(r[1] for r in rows) or "(system log is empty)"
+
+
 class HAClient:
     def __init__(
         self,
@@ -202,8 +219,17 @@ class HAClient:
         return resp.text
 
     async def get_error_log(self) -> str:
-        resp = await self._request("GET", "/error_log")
-        return resp.text
+        """Raw error log via REST; falls back to the system_log over WebSocket.
+
+        Through the Supervisor proxy (the add-on), ``/api/error_log`` returns 404, so the
+        fallback is what add-on deployments actually use.
+        """
+        try:
+            resp = await self._request("GET", "/error_log")
+            return resp.text
+        except HANotFoundError:
+            entries = await self.ws_command("system_log/list") or []
+            return format_system_log(entries)
 
     async def check_config(self) -> dict[str, Any]:
         return await self._json("POST", "/config/core/check_config")
