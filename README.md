@@ -170,6 +170,15 @@ On Home Assistant OS there is no host shell, so RavenCorvus ships as a local add
 5. **Start it** and open the Log tab: it prints the connector URL `https://<host>/<secret>/mcp`.
    Treat that URL like a password and add it in claude.ai under Settings > Connectors > Add custom connector.
 
+**Cloudflare Access (recommended):** put an Access self-hosted application on the hostname, then set
+`access_team` and `access_aud`. The server verifies the `Cf-Access-Jwt-Assertion` header, claude.ai signs
+in through Access at `https://<host>/mcp`, and no secret travels in the URL. Anthropic's connector guidance
+says credentials should not be passed in URLs. See `docs/SETUP.md`.
+
+**Diagnostics tools:** `check_config`, `get_automation_config`, `list_automation_traces`,
+`get_automation_trace` (read) and `create_backup` (write). CLI: `ha check-config`, `ha automation`,
+`ha traces`, `ha trace`, `ha backup`.
+
 Options: `denied_entities`, `allowed_domains`, `allow_sensitive_domains` map to the `HASS_*` variables above.
 The add-on reaches HA at `http://homeassistant:8123` on the internal add-on network (`ha_url`).
 
